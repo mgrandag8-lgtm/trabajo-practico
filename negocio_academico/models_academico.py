@@ -1,28 +1,46 @@
 
-"""Modelos del negocio académico."""
+# ==================================================
+# SISTEMA ACADEMICO
+# Archivo: models_academico.py
+# ==================================================
 
+# Importamos las clases base que ya programamos.
 from models import ModeloBase, Persona
 
 
-# =====================================================
-# CLASE ESTUDIANTE - HERENCIA
-# =====================================================
+# ==================================================
+# CLASE 1: ESTUDIANTE
+# ==================================================
+
+# Estudiante hereda de Persona.
+# Ya tiene nombre, apellido y email.
+# Solo necesitamos agregar el carnet.
 
 class Estudiante(Persona):
+
     CAMPOS = Persona.CAMPOS + ("carnet",)
+
     OBLIGATORIOS = Persona.OBLIGATORIOS + ("carnet",)
 
+    # Constructor del estudiante.
     def __init__(self, id_registro, nombre, apellido, email, carnet):
+
+        # Reutilizamos el constructor de Persona.
         super().__init__(id_registro, nombre, apellido, email)
+
+        # Guardamos el carnet usando su validacion.
         self.carnet = carnet
 
+    # Permite consultar el carnet.
     @property
     def carnet(self):
         return self.__carnet
 
+    # Permite modificar y validar el carnet.
     @carnet.setter
     def carnet(self, valor):
-        valor = Estudiante.limpiar(valor).upper()
+
+        valor = self.limpiar(valor).upper()
 
         if len(valor) < 4:
             raise ValueError(
@@ -31,30 +49,40 @@ class Estudiante(Persona):
 
         self.__carnet = valor
 
+    # Convierte el estudiante en un diccionario.
+    # Esto permite guardarlo en JSON.
     def a_diccionario(self):
+
         datos = super().a_diccionario()
-        datos["carnet"] = self.__carnet
+
+        datos["carnet"] = self.carnet
+
         return datos
 
+    # Devuelve el texto que veremos al listar.
     def etiqueta(self):
-        return (
-            f"{self.nombre_completo} "
-            f"- carnet {self.__carnet}"
-        )
+
+        return f"{self.nombre_completo} - Carnet: {self.carnet}"
 
 
-# =====================================================
-# CLASE DOCENTE - HERENCIA
-# =====================================================
+# ==================================================
+# CLASE 2: DOCENTE
+# ==================================================
+
+# Docente tambien hereda de Persona.
+# Agregamos titulo y especialidad.
 
 class Docente(Persona):
+
     CAMPOS = Persona.CAMPOS + ("titulo", "especialidad")
+
     OBLIGATORIOS = Persona.OBLIGATORIOS
 
     def __init__(
         self, id_registro, nombre, apellido,
         email, titulo="", especialidad=""
     ):
+
         super().__init__(id_registro, nombre, apellido, email)
 
         self.titulo = titulo
@@ -66,7 +94,8 @@ class Docente(Persona):
 
     @titulo.setter
     def titulo(self, valor):
-        self.__titulo = Docente.limpiar(valor)
+
+        self.__titulo = self.limpiar(valor)
 
     @property
     def especialidad(self):
@@ -74,35 +103,45 @@ class Docente(Persona):
 
     @especialidad.setter
     def especialidad(self, valor):
-        self.__especialidad = Docente.limpiar(valor).title()
 
+        self.__especialidad = self.limpiar(valor).title()
+
+    # Preparamos los datos para JSON.
     def a_diccionario(self):
+
         datos = super().a_diccionario()
-        datos["titulo"] = self.__titulo
-        datos["especialidad"] = self.__especialidad
+
+        datos["titulo"] = self.titulo
+        datos["especialidad"] = self.especialidad
+
         return datos
 
     def etiqueta(self):
-        prefijo = f"{self.__titulo} " if self.__titulo else ""
 
         return (
-            f"{prefijo}{self.nombre_completo} - "
-            f"{self.__especialidad or 'sin especialidad'}"
+            f"{self.nombre_completo} - "
+            f"Especialidad: {self.especialidad or 'Sin especialidad'}"
         )
 
 
-# =====================================================
-# CLASE MATERIA - AGREGACION
-# =====================================================
+# ==================================================
+# CLASE 3: MATERIA
+# ==================================================
+
+# Una materia existe independientemente.
+# Puede tener un docente asignado.
 
 class Materia(ModeloBase):
+
     CAMPOS = ("nombre", "codigo", "creditos", "docente_id")
+
     OBLIGATORIOS = ("nombre", "codigo")
 
     def __init__(
         self, id_registro, nombre, codigo,
         creditos=0, docente_id=None
     ):
+
         super().__init__(id_registro)
 
         self.nombre = nombre
@@ -110,20 +149,27 @@ class Materia(ModeloBase):
         self.creditos = creditos
         self.docente_id = docente_id
 
+    # ==============================================
+    # NOMBRE DE LA MATERIA
+    # ==============================================
+
     @property
     def nombre(self):
         return self.__nombre
 
     @nombre.setter
     def nombre(self, valor):
-        valor = Materia.limpiar(valor)
+
+        valor = self.limpiar(valor)
 
         if not valor:
-            raise ValueError(
-                "El nombre de la materia es obligatorio"
-            )
+            raise ValueError("La materia necesita un nombre")
 
         self.__nombre = valor.title()
+
+    # ==============================================
+    # CODIGO DE LA MATERIA
+    # ==============================================
 
     @property
     def codigo(self):
@@ -131,7 +177,8 @@ class Materia(ModeloBase):
 
     @codigo.setter
     def codigo(self, valor):
-        valor = Materia.limpiar(valor).upper()
+
+        valor = self.limpiar(valor).upper()
 
         if len(valor) < 3:
             raise ValueError(
@@ -140,25 +187,33 @@ class Materia(ModeloBase):
 
         self.__codigo = valor
 
+    # ==============================================
+    # CREDITOS
+    # ==============================================
+
     @property
     def creditos(self):
         return self.__creditos
 
     @creditos.setter
     def creditos(self, valor):
-        try:
-            valor = int(valor or 0)
-        except (TypeError, ValueError):
-            raise ValueError(
-                f"Los creditos deben ser un numero: '{valor}'"
-            )
 
-        if not 0 <= valor <= 10:
+        try:
+            numero = int(valor or 0)
+
+        except (ValueError, TypeError):
+            raise ValueError("Los creditos deben ser un numero")
+
+        if numero < 0 or numero > 10:
             raise ValueError(
                 "Los creditos deben estar entre 0 y 10"
             )
 
-        self.__creditos = valor
+        self.__creditos = numero
+
+    # ==============================================
+    # DOCENTE ASIGNADO
+    # ==============================================
 
     @property
     def docente_id(self):
@@ -166,59 +221,66 @@ class Materia(ModeloBase):
 
     @docente_id.setter
     def docente_id(self, valor):
-        if valor in (None, "", "0"):
+
+        # Una materia puede estar sin docente.
+        if valor is None or str(valor).strip() in ("", "0"):
+
             self.__docente_id = None
             return
 
         try:
-            self.__docente_id = int(valor)
-        except (TypeError, ValueError):
-            raise ValueError(
-                f"docente_id invalido: '{valor}'"
-            )
+            numero = int(valor)
 
+        except (ValueError, TypeError):
+            raise ValueError("El ID del docente debe ser un numero")
+
+        if numero <= 0:
+            raise ValueError("El ID del docente debe ser positivo")
+
+        self.__docente_id = numero
+
+    # Convertimos la materia en diccionario.
     def a_diccionario(self):
+
         return {
             "id": self.id,
-            "nombre": self.__nombre,
-            "codigo": self.__codigo,
-            "creditos": self.__creditos,
-            "docente_id": self.__docente_id
+            "nombre": self.nombre,
+            "codigo": self.codigo,
+            "creditos": self.creditos,
+            "docente_id": self.docente_id
         }
 
+    # Mostramos la informacion de la materia.
     def etiqueta(self):
-        docente = (
-            f"docente {self.__docente_id}"
-            if self.__docente_id
-            else "sin docente"
-        )
 
         return (
-            f"{self.__codigo} - {self.__nombre} - "
-            f"{self.__creditos} creditos - {docente}"
+            f"{self.codigo} - {self.nombre} - "
+            f"Creditos: {self.creditos} - "
+            f"Docente ID: {self.docente_id or 'Sin asignar'}"
         )
 
 
-# =====================================================
-# CLASE NOTA - COMPOSICION
-# =====================================================
+# ==================================================
+# CLASE 4: NOTA
+# ==================================================
+
+# Esta clase representa una calificacion.
+# Una nota pertenece a una matricula.
 
 class Nota:
+
+    # Tipos de evaluacion permitidos.
     TIPOS = ("deber", "lección", "examen")
-    MINIMA = 0
-    MAXIMA = 20
 
     def __init__(self, tipo, valor, peso=1):
+
         self.tipo = tipo
         self.valor = valor
         self.peso = peso
 
-    @staticmethod
-    def es_valida(valor):
-        return (
-            isinstance(valor, (int, float))
-            and Nota.MINIMA <= valor <= Nota.MAXIMA
-        )
+    # ==============================================
+    # TIPO DE NOTA
+    # ==============================================
 
     @property
     def tipo(self):
@@ -226,104 +288,138 @@ class Nota:
 
     @tipo.setter
     def tipo(self, valor):
+
         valor = str(valor).strip().lower()
 
-        if valor not in Nota.TIPOS:
+        # Aceptamos tambien la palabra sin tilde.
+        if valor == "leccion":
+            valor = "lección"
+
+        if valor not in self.TIPOS:
             raise ValueError(
-                f"Tipo invalido. Use uno de: "
-                f"{', '.join(Nota.TIPOS)}"
+                "El tipo debe ser deber, leccion o examen"
             )
 
         self.__tipo = valor
+
+    # ==============================================
+    # VALOR DE LA NOTA
+    # ==============================================
 
     @property
     def valor(self):
         return self.__valor
 
     @valor.setter
-    def valor(self, valor):
+    def valor(self, numero):
+
         try:
-            valor = float(valor)
-        except (TypeError, ValueError):
-            raise ValueError(
-                f"La nota debe ser un numero: '{valor}'"
-            )
+            numero = float(numero)
 
-        if not Nota.es_valida(valor):
-            raise ValueError(
-                "La nota debe estar entre 0 y 20"
-            )
+        except (ValueError, TypeError):
+            raise ValueError("La nota debe ser un numero")
 
-        self.__valor = round(valor, 2)
+        # La nota debe estar entre 0 y 20.
+        if not 0 <= numero <= 20:
+            raise ValueError("La nota debe estar entre 0 y 20")
+
+        self.__valor = round(numero, 2)
+
+    # ==============================================
+    # PESO DE LA NOTA
+    # ==============================================
 
     @property
     def peso(self):
         return self.__peso
 
     @peso.setter
-    def peso(self, valor):
+    def peso(self, numero):
+
         try:
-            valor = float(valor)
-        except (TypeError, ValueError):
-            raise ValueError(
-                "El peso debe ser un numero"
-            )
+            numero = float(numero)
 
-        if valor <= 0:
-            raise ValueError(
-                "El peso debe ser mayor a 0"
-            )
+        except (ValueError, TypeError):
+            raise ValueError("El peso debe ser un numero")
 
-        self.__peso = valor
+        if numero <= 0 or numero == float("inf"):
+            raise ValueError("El peso debe ser positivo y finito")
 
+        self.__peso = numero
+
+    # Guardamos la nota como diccionario.
     def a_diccionario(self):
+
         return {
-            "tipo": self.__tipo,
-            "valor": self.__valor,
-            "peso": self.__peso
+            "tipo": self.tipo,
+            "valor": self.valor,
+            "peso": self.peso
         }
 
+    # Recuperamos una nota desde JSON.
     @classmethod
     def desde_diccionario(cls, datos):
+
         return cls(
             datos["tipo"],
             datos["valor"],
             datos.get("peso", 1)
         )
 
+    # Texto que representa la nota.
     def __str__(self):
-        return f"{self.__tipo}: {self.__valor}"
+
+        return f"{self.tipo}: {self.valor} (peso {self.peso:g})"
 
 
-# =====================================================
-# CLASE MATRICULA - COMPOSICION Y AGREGACION
-# =====================================================
+# ==================================================
+# CLASE 5: MATRICULA
+# ==================================================
+
+# Una matricula relaciona estudiante y materia.
+# Dentro de ella guardamos las notas.
 
 class Matricula(ModeloBase):
+
+    # Estos son los datos que pediremos en el menu.
+    # Las notas se agregan por separado.
     CAMPOS = ("estudiante_id", "materia_id", "periodo")
+
     OBLIGATORIOS = ("estudiante_id", "materia_id")
 
+    # Puedes cambiar esta nota para modificar
+    # la calificacion minima de aprobacion.
     NOTA_APROBACION = 14
 
     def __init__(
         self, id_registro, estudiante_id,
         materia_id, periodo="", notas=None
     ):
+
         super().__init__(id_registro)
 
         self.estudiante_id = estudiante_id
         self.materia_id = materia_id
         self.periodo = periodo
 
+        # Esta lista privada guarda las notas.
         self.__notas = []
 
-        if notas:
+        # Recuperamos notas cuando leemos un JSON.
+        if notas is not None:
+
             for nota in notas:
+
                 if not isinstance(nota, Nota):
                     raise ValueError(
-                        "Las notas deben ser objetos Nota"
+                        "Solo se pueden agregar objetos Nota"
                     )
+
                 self.__notas.append(nota)
+
+    # ==============================================
+    # ID DEL ESTUDIANTE
+    # ==============================================
 
     @property
     def estudiante_id(self):
@@ -331,19 +427,21 @@ class Matricula(ModeloBase):
 
     @estudiante_id.setter
     def estudiante_id(self, valor):
+
         try:
-            valor = int(valor)
-        except (TypeError, ValueError):
-            raise ValueError(
-                "El ID del estudiante debe ser un numero"
-            )
+            numero = int(valor)
 
-        if valor <= 0:
-            raise ValueError(
-                "El ID del estudiante debe ser positivo"
-            )
+        except (ValueError, TypeError):
+            raise ValueError("ID de estudiante invalido")
 
-        self.__estudiante_id = valor
+        if numero <= 0:
+            raise ValueError("El ID debe ser positivo")
+
+        self.__estudiante_id = numero
+
+    # ==============================================
+    # ID DE LA MATERIA
+    # ==============================================
 
     @property
     def materia_id(self):
@@ -351,19 +449,21 @@ class Matricula(ModeloBase):
 
     @materia_id.setter
     def materia_id(self, valor):
+
         try:
-            valor = int(valor)
-        except (TypeError, ValueError):
-            raise ValueError(
-                "El ID de la materia debe ser un numero"
-            )
+            numero = int(valor)
 
-        if valor <= 0:
-            raise ValueError(
-                "El ID de la materia debe ser positivo"
-            )
+        except (ValueError, TypeError):
+            raise ValueError("ID de materia invalido")
 
-        self.__materia_id = valor
+        if numero <= 0:
+            raise ValueError("El ID debe ser positivo")
+
+        self.__materia_id = numero
+
+    # ==============================================
+    # PERIODO ACADEMICO
+    # ==============================================
 
     @property
     def periodo(self):
@@ -371,63 +471,88 @@ class Matricula(ModeloBase):
 
     @periodo.setter
     def periodo(self, valor):
-        self.__periodo = (
-            Matricula.limpiar(valor) or "2026-1"
-        )
+
+        # Si el usuario no escribe periodo,
+        # utilizamos 2026-1 por defecto.
+        self.__periodo = self.limpiar(valor) or "2026-1"
+
+    # ==============================================
+    # CONSULTAR NOTAS
+    # ==============================================
 
     @property
     def notas(self):
+
+        # Devolvemos una tupla para proteger
+        # la lista interna de notas.
         return tuple(self.__notas)
+
+    # ==============================================
+    # AGREGAR NOTA
+    # ==============================================
+
+    def agregar_nota(self, tipo, valor, peso=1):
+
+        # Creamos una nota con sus validaciones.
+        nueva_nota = Nota(tipo, valor, peso)
+
+        # La agregamos a la matricula.
+        self.__notas.append(nueva_nota)
+
+        return nueva_nota
+
+    # ==============================================
+    # CALCULAR PROMEDIO
+    # ==============================================
 
     @property
     def promedio(self):
+
+        # Sin notas, el promedio mostrado sera 0.
         if not self.__notas:
             return 0
 
-        puntos = sum(
-            nota.valor * nota.peso
-            for nota in self.__notas
-        )
+        suma = 0
+        total_pesos = 0
 
-        pesos = sum(
-            nota.peso
-            for nota in self.__notas
-        )
+        # Recorremos todas las notas.
+        for nota in self.__notas:
 
-        return round(puntos / pesos, 2)
+            suma += nota.valor * nota.peso
+
+            total_pesos += nota.peso
+
+        # Calculamos el promedio ponderado.
+        return round(suma / total_pesos, 2)
+
+    # ==============================================
+    # ESTADO ACADEMICO
+    # ==============================================
 
     @property
     def estado(self):
+
+        # Si no hay notas, aun no hay calificacion.
         if not self.__notas:
             return "Sin notas"
 
+        # Comprobamos la nota minima de aprobacion.
         if self.promedio >= self.NOTA_APROBACION:
             return "Aprobado"
 
         return "Reprobado"
 
-    def agregar_nota(self, tipo, valor, peso=1):
-        nota = Nota(tipo, valor, peso)
-
-        self.__notas.append(nota)
-
-        return nota
-
-    def notas_por_tipo(self, tipo):
-        tipo = str(tipo).strip().lower()
-
-        return [
-            nota
-            for nota in self.__notas
-            if nota.tipo == tipo
-        ]
+    # ==============================================
+    # CONVERTIR MATRICULA EN DICCIONARIO
+    # ==============================================
 
     def a_diccionario(self):
+
         return {
             "id": self.id,
-            "estudiante_id": self.__estudiante_id,
-            "materia_id": self.__materia_id,
-            "periodo": self.__periodo,
+            "estudiante_id": self.estudiante_id,
+            "materia_id": self.materia_id,
+            "periodo": self.periodo,
             "promedio": self.promedio,
             "estado": self.estado,
             "notas": [
@@ -436,13 +561,23 @@ class Matricula(ModeloBase):
             ]
         }
 
+    # ==============================================
+    # RECUPERAR MATRICULA DESDE JSON
+    # ==============================================
+
     @classmethod
     def desde_diccionario(cls, datos):
-        notas = [
-            Nota.desde_diccionario(nota)
-            for nota in datos.get("notas", [])
-        ]
 
+        # Convertimos los diccionarios en objetos Nota.
+        notas = []
+
+        for dato_nota in datos.get("notas", []):
+
+            nota = Nota.desde_diccionario(dato_nota)
+
+            notas.append(nota)
+
+        # Construimos la matricula con sus notas.
         return cls(
             datos["id"],
             datos["estudiante_id"],
@@ -451,11 +586,16 @@ class Matricula(ModeloBase):
             notas
         )
 
+    # ==============================================
+    # MOSTRAR MATRICULA
+    # ==============================================
+
     def etiqueta(self):
+
         return (
-            f"Estudiante {self.__estudiante_id} - "
-            f"Materia {self.__materia_id} - "
-            f"Periodo {self.__periodo} - "
-            f"Promedio {self.promedio} "
-            f"({self.estado})"
+            f"Estudiante ID: {self.estudiante_id} - "
+            f"Materia ID: {self.materia_id} - "
+            f"Periodo: {self.periodo} - "
+            f"Promedio: {self.promedio} - "
+            f"Estado: {self.estado}"
         )

@@ -1,6 +1,10 @@
 
-"""Controladores y menus del negocio academico."""
+# ==================================================
+# SISTEMA ACADEMICO
+# Archivo: views_academico.py
+# ==================================================
 
+# Importamos nuestros modelos academicos.
 from models_academico import (
     Estudiante,
     Docente,
@@ -8,21 +12,23 @@ from models_academico import (
     Matricula
 )
 
+# Reutilizamos el CRUD y el menu general.
 from views import CrudBase, MenuCRUD
 
+# Funciones para mostrar mensajes.
 from shared.herramientas import (
     imprimir_titulo,
     imprimir_exito,
     imprimir_error,
-    imprimir_info,
-    confirmar
+    imprimir_info
 )
 
 
-# =====================================================
-# CONTROLADOR DE ESTUDIANTES
-# =====================================================
+# ==================================================
+# 1. CONTROLADOR DE ESTUDIANTES
+# ==================================================
 
+# Heredamos las operaciones de CrudBase.
 class EstudianteController(CrudBase):
 
     MODELO = Estudiante
@@ -30,52 +36,72 @@ class EstudianteController(CrudBase):
     NOMBRE = "estudiante"
 
     CAMPOS_BUSCABLES = (
-        "nombre",
-        "apellido",
-        "email",
-        "carnet"
+        "nombre", "apellido", "email", "carnet"
     )
 
+    # Comprueba que los datos sean correctos.
     def validar(self, datos, id_actual=None):
 
+        # Revisamos los campos obligatorios.
         for campo in self.MODELO.OBLIGATORIOS:
+
             if not str(datos.get(campo, "")).strip():
                 raise ValueError(
                     f"El campo {campo} es obligatorio"
                 )
 
-        carnet = str(datos["carnet"]).strip().upper()
         email = str(datos["email"]).strip().lower()
+        carnet = str(datos["carnet"]).strip().upper()
 
+        # Comprobamos que el carnet no este repetido.
+        if len(carnet) < 4:
+            raise ValueError(
+                "El carnet necesita 4 caracteres como minimo"
+            )
+
+        # Revisamos los estudiantes registrados.
         for estudiante in self.listar():
 
+            # Si estamos actualizando, ignoramos
+            # el registro que estamos modificando.
             if estudiante.id == id_actual:
                 continue
 
             if estudiante.carnet == carnet:
                 raise ValueError(
-                    "El carnet ya esta registrado"
+                    "Este carnet ya esta registrado"
                 )
 
             if estudiante.email == email:
                 raise ValueError(
-                    "El correo ya esta registrado"
+                    "Este correo ya esta registrado"
                 )
 
+    # No eliminamos estudiantes matriculados.
     def eliminar(self, id_registro):
-        for matricula in MatriculaController().listar():
-            if matricula.estudiante_id == int(id_registro):
+
+        estudiante = self.obtener(id_registro)
+
+        if estudiante is None:
+            raise ValueError("El estudiante no existe")
+
+        matriculas = MatriculaController().listar()
+
+        for matricula in matriculas:
+
+            if matricula.estudiante_id == estudiante.id:
                 raise ValueError(
-                    "No se puede eliminar un estudiante "
+                    "No puedes eliminar un estudiante "
                     "que tiene matriculas"
                 )
 
+        # super() utiliza el metodo del padre.
         return super().eliminar(id_registro)
 
 
-# =====================================================
-# CONTROLADOR DE DOCENTES
-# =====================================================
+# ==================================================
+# 2. CONTROLADOR DE DOCENTES
+# ==================================================
 
 class DocenteController(CrudBase):
 
@@ -84,15 +110,13 @@ class DocenteController(CrudBase):
     NOMBRE = "docente"
 
     CAMPOS_BUSCABLES = (
-        "nombre",
-        "apellido",
-        "email",
-        "especialidad"
+        "nombre", "apellido", "email", "especialidad"
     )
 
     def validar(self, datos, id_actual=None):
 
         for campo in self.MODELO.OBLIGATORIOS:
+
             if not str(datos.get(campo, "")).strip():
                 raise ValueError(
                     f"El campo {campo} es obligatorio"
@@ -100,6 +124,7 @@ class DocenteController(CrudBase):
 
         email = str(datos["email"]).strip().lower()
 
+        # No permitimos dos docentes con el mismo email.
         for docente in self.listar():
 
             if docente.id == id_actual:
@@ -107,23 +132,33 @@ class DocenteController(CrudBase):
 
             if docente.email == email:
                 raise ValueError(
-                    "El correo del docente ya existe"
+                    "Ya existe un docente con ese correo"
                 )
 
+    # Protegemos los docentes asignados.
     def eliminar(self, id_registro):
-        for materia in MateriaController(self).listar():
-            if materia.docente_id == int(id_registro):
+
+        docente = self.obtener(id_registro)
+
+        if docente is None:
+            raise ValueError("El docente no existe")
+
+        materias = MateriaController(self).listar()
+
+        for materia in materias:
+
+            if materia.docente_id == docente.id:
                 raise ValueError(
-                    "No se puede eliminar un docente "
+                    "No puedes eliminar un docente "
                     "asignado a una materia"
                 )
 
         return super().eliminar(id_registro)
 
 
-# =====================================================
-# CONTROLADOR DE MATERIAS
-# =====================================================
+# ==================================================
+# 3. CONTROLADOR DE MATERIAS
+# ==================================================
 
 class MateriaController(CrudBase):
 
@@ -131,23 +166,23 @@ class MateriaController(CrudBase):
     ARCHIVO = "data/materias.json"
     NOMBRE = "materia"
 
-    CAMPOS_BUSCABLES = (
-        "nombre",
-        "codigo"
-    )
+    CAMPOS_BUSCABLES = ("nombre", "codigo")
 
+    # Recibimos el controlador de docentes.
     def __init__(self, docentes=None):
+
         super().__init__()
 
-        self.docentes = (
-            docentes
-            if docentes is not None
-            else DocenteController()
-        )
+        if docentes is None:
+            docentes = DocenteController()
 
+        self.docentes = docentes
+
+    # Validamos materias y docentes.
     def validar(self, datos, id_actual=None):
 
         for campo in self.MODELO.OBLIGATORIOS:
+
             if not str(datos.get(campo, "")).strip():
                 raise ValueError(
                     f"El campo {campo} es obligatorio"
@@ -155,6 +190,12 @@ class MateriaController(CrudBase):
 
         codigo = str(datos["codigo"]).strip().upper()
 
+        if len(codigo) < 3:
+            raise ValueError(
+                "El codigo necesita minimo 3 caracteres"
+            )
+
+        # No permitimos codigos repetidos.
         for materia in self.listar():
 
             if materia.id == id_actual:
@@ -162,73 +203,88 @@ class MateriaController(CrudBase):
 
             if materia.codigo == codigo:
                 raise ValueError(
-                    "El codigo de materia ya existe"
+                    "Ya existe una materia con ese codigo"
                 )
 
-        creditos = datos.get("creditos", 0)
-
+        # Validamos la cantidad de creditos.
         try:
-            creditos = int(creditos or 0)
+            creditos = int(datos.get("creditos") or 0)
+
         except (ValueError, TypeError):
             raise ValueError(
-                "Los creditos deben ser un numero"
+                "Los creditos deben ser un numero entero"
             )
 
-        if not 0 <= creditos <= 10:
+        if creditos < 0 or creditos > 10:
             raise ValueError(
                 "Los creditos deben estar entre 0 y 10"
             )
 
+        # Una materia puede no tener docente.
         docente_id = datos.get("docente_id")
 
-        if docente_id not in (None, "", "0"):
+        if docente_id is not None and str(docente_id).strip() not in ("", "0"):
 
-            if self.docentes.obtener(docente_id) is None:
+            docente = self.docentes.obtener(docente_id)
+
+            if docente is None:
                 raise ValueError(
                     "El docente asignado no existe"
                 )
 
+    # Permite cambiar el docente de una materia.
     def asignar_docente(self, materia_id, docente_id):
 
-        materia = self.obtener(materia_id)
-
-        if materia is None:
-            raise ValueError(
-                "La materia no existe"
-            )
+        if self.obtener(materia_id) is None:
+            raise ValueError("La materia no existe")
 
         if self.docentes.obtener(docente_id) is None:
-            raise ValueError(
-                "El docente no existe"
-            )
+            raise ValueError("El docente no existe")
 
         return self.actualizar(
             materia_id,
             {"docente_id": docente_id}
         )
 
+    # Devuelve las materias de un docente.
     def materias_de_docente(self, docente_id):
 
-        return [
-            materia
-            for materia in self.listar()
-            if materia.docente_id == int(docente_id)
-        ]
+        docente = self.docentes.obtener(docente_id)
 
+        if docente is None:
+            raise ValueError("El docente no existe")
+
+        resultado = []
+
+        for materia in self.listar():
+
+            if materia.docente_id == docente.id:
+                resultado.append(materia)
+
+        return resultado
+
+    # No eliminamos materias con matriculas.
     def eliminar(self, id_registro):
+
+        materia = self.obtener(id_registro)
+
+        if materia is None:
+            raise ValueError("La materia no existe")
+
         for matricula in MatriculaController().listar():
-            if matricula.materia_id == int(id_registro):
+
+            if matricula.materia_id == materia.id:
                 raise ValueError(
-                    "No se puede eliminar una materia "
-                    "que tiene matriculas"
+                    "No puedes eliminar una materia "
+                    "con estudiantes matriculados"
                 )
 
         return super().eliminar(id_registro)
 
 
-# =====================================================
-# CONTROLADOR DE MATRICULAS
-# =====================================================
+# ==================================================
+# 4. CONTROLADOR DE MATRICULAS
+# ==================================================
 
 class MatriculaController(CrudBase):
 
@@ -239,52 +295,60 @@ class MatriculaController(CrudBase):
     CAMPOS_BUSCABLES = ("periodo",)
 
     def __init__(self, estudiantes=None, materias=None):
+
         super().__init__()
 
-        self.estudiantes = (
-            estudiantes
-            if estudiantes is not None
-            else EstudianteController()
-        )
+        if estudiantes is None:
+            estudiantes = EstudianteController()
 
-        self.materias = (
-            materias
-            if materias is not None
-            else MateriaController()
-        )
+        if materias is None:
+            materias = MateriaController()
 
-    # -------------------------------------------------
+        self.estudiantes = estudiantes
+        self.materias = materias
+
+    # ==============================================
     # VALIDAR MATRICULA
-    # -------------------------------------------------
+    # ==============================================
 
     def validar(self, datos, id_actual=None):
 
         estudiante_id = datos.get("estudiante_id")
         materia_id = datos.get("materia_id")
 
-        periodo = (
-            str(datos.get("periodo") or "2026-1")
-            .strip()
+        periodo = str(
+            datos.get("periodo") or "2026-1"
+        ).strip()
+
+        # El estudiante debe existir.
+        estudiante = self.estudiantes.obtener(
+            estudiante_id
         )
 
-        if self.estudiantes.obtener(estudiante_id) is None:
+        if estudiante is None:
             raise ValueError(
-                "El estudiante no existe"
+                "El estudiante no esta registrado"
             )
 
-        if self.materias.obtener(materia_id) is None:
+        # La materia tambien debe existir.
+        materia = self.materias.obtener(materia_id)
+
+        if materia is None:
             raise ValueError(
-                "La materia no existe"
+                "La materia no esta registrada"
             )
 
+        # Evitamos matricular dos veces
+        # al mismo estudiante en la misma materia
+        # durante el mismo periodo.
         for matricula in self.listar():
 
             if matricula.id == id_actual:
                 continue
 
             if (
-                matricula.estudiante_id == int(estudiante_id)
-                and matricula.materia_id == int(materia_id)
+                matricula.estudiante_id == estudiante.id
+                and matricula.materia_id == materia.id
                 and matricula.periodo == periodo
             ):
                 raise ValueError(
@@ -292,32 +356,39 @@ class MatriculaController(CrudBase):
                     "en esa materia y periodo"
                 )
 
-    # -------------------------------------------------
-    # ACTUALIZAR SIN PERDER LAS NOTAS
-    # -------------------------------------------------
+    # ==============================================
+    # ACTUALIZAR SIN BORRAR NOTAS
+    # ==============================================
 
+    # Sobrescribimos el metodo general porque
+    # las matriculas contienen notas adicionales.
     def actualizar(self, id_registro, cambios):
 
         actual = self.obtener(id_registro)
 
         if actual is None:
-            raise ValueError(
-                "La matricula no existe"
-            )
+            raise ValueError("La matricula no existe")
 
+        # Obtenemos todos los datos, incluidas notas.
         datos = actual.a_diccionario()
 
+        # Solo cambiamos los campos autorizados.
         for campo, valor in cambios.items():
+
             if campo in self.MODELO.CAMPOS:
                 datos[campo] = valor
 
         self.validar(datos, actual.id)
 
-        actualizado = Matricula.desde_diccionario(datos)
+        # Recuperamos tambien las notas anteriores.
+        actualizado = Matricula.desde_diccionario(
+            datos
+        )
 
         objetos = self.listar()
 
         for indice, objeto in enumerate(objetos):
+
             if objeto.id == actual.id:
                 objetos[indice] = actualizado
                 break
@@ -326,9 +397,9 @@ class MatriculaController(CrudBase):
 
         return actualizado
 
-    # -------------------------------------------------
+    # ==============================================
     # AGREGAR NOTA
-    # -------------------------------------------------
+    # ==============================================
 
     def agregar_nota(
         self, matricula_id, tipo, valor, peso=1
@@ -341,25 +412,29 @@ class MatriculaController(CrudBase):
                 "La matricula no existe"
             )
 
-        nota = matricula.agregar_nota(
+        # El modelo Nota valida el valor y el tipo.
+        nueva_nota = matricula.agregar_nota(
             tipo, valor, peso
         )
 
+        # Buscamos la matricula en la lista.
         objetos = self.listar()
 
         for indice, objeto in enumerate(objetos):
 
             if objeto.id == matricula.id:
+
                 objetos[indice] = matricula
                 break
 
+        # Es obligatorio guardar despues de agregar.
         self.guardar(objetos)
 
-        return nota
+        return nueva_nota
 
-    # -------------------------------------------------
-    # BOLETIN DEL ESTUDIANTE
-    # -------------------------------------------------
+    # ==============================================
+    # GENERAR BOLETIN
+    # ==============================================
 
     def boletin(self, estudiante_id):
 
@@ -372,19 +447,22 @@ class MatriculaController(CrudBase):
                 "El estudiante no existe"
             )
 
-        matriculas = [
-            matricula
-            for matricula in self.listar()
-            if matricula.estudiante_id == estudiante.id
-        ]
+        # Buscamos sus matriculas.
+        matriculas = []
 
+        for matricula in self.listar():
+
+            if matricula.estudiante_id == estudiante.id:
+                matriculas.append(matricula)
+
+        # Preparamos las lineas del boletin.
         lineas = [
-            "=" * 55,
+            "=" * 50,
             "BOLETIN ACADEMICO",
-            "=" * 55,
+            "=" * 50,
             f"Estudiante: {estudiante.nombre_completo}",
             f"Carnet: {estudiante.carnet}",
-            "-" * 55
+            "-" * 50
         ]
 
         if not matriculas:
@@ -401,11 +479,10 @@ class MatriculaController(CrudBase):
                 matricula.materia_id
             )
 
-            nombre_materia = (
-                materia.nombre
-                if materia is not None
-                else "Materia no encontrada"
-            )
+            if materia is None:
+                nombre_materia = "Materia no encontrada"
+            else:
+                nombre_materia = materia.nombre
 
             lineas.append(
                 f"Materia: {nombre_materia}"
@@ -415,11 +492,14 @@ class MatriculaController(CrudBase):
                 f"Periodo: {matricula.periodo}"
             )
 
+            # Mostramos cada nota registrada.
             if matricula.notas:
+
                 for nota in matricula.notas:
+
                     lineas.append(
-                        f"  {nota.tipo}: {nota.valor}"
-                        f" (peso {nota.peso:g})"
+                        f"  {nota.tipo}: {nota.valor} "
+                        f"(peso {nota.peso:g})"
                     )
 
                 promedios.append(matricula.promedio)
@@ -435,24 +515,30 @@ class MatriculaController(CrudBase):
                 f"Estado: {matricula.estado}"
             )
 
-            lineas.append("-" * 55)
+            lineas.append("-" * 50)
 
+        # Promedio general de materias con notas.
         if promedios:
+
             promedio_general = (
                 sum(promedios) / len(promedios)
             )
+
+            lineas.append(
+                f"Promedio general: {promedio_general:.2f}"
+            )
+
         else:
-            promedio_general = 0
+            lineas.append(
+                "Promedio general: Sin notas"
+            )
 
-        lineas.append(
-            f"Promedio general: {promedio_general:.2f}"
-        )
-
+        # Convertimos la lista en un texto.
         return "\n".join(lineas)
 
-    # -------------------------------------------------
-    # REPORTE DE ESTUDIANTES REPROBADOS
-    # -------------------------------------------------
+    # ==============================================
+    # ESTUDIANTES REPROBADOS
+    # ==============================================
 
     def estudiantes_reprobados(self):
 
@@ -484,29 +570,28 @@ class MatriculaController(CrudBase):
         return resultados
 
 
-# =====================================================
-# MENU ESPECIAL DE MATRICULAS
-# =====================================================
+# ==================================================
+# 5. MENU ESPECIAL DE MATRICULAS
+# ==================================================
 
+# Heredamos el menu CRUD para reutilizar
+# listar, buscar, actualizar y eliminar.
 class MenuMatriculas(MenuCRUD):
 
-    def __init__(self, controlador):
-        super().__init__(controlador)
-
-    # -------------------------------------------------
+    # ==============================================
     # REGISTRAR MATRICULA
-    # -------------------------------------------------
+    # ==============================================
 
     def crear(self):
 
         imprimir_titulo("REGISTRAR MATRICULA")
 
-        print("\nESTUDIANTES DISPONIBLES")
+        print("\nESTUDIANTES:")
         self.mostrar_registros(
             self._controlador.estudiantes.listar()
         )
 
-        print("\nMATERIAS DISPONIBLES")
+        print("\nMATERIAS:")
         self.mostrar_registros(
             self._controlador.materias.listar()
         )
@@ -530,20 +615,20 @@ class MenuMatriculas(MenuCRUD):
                 "periodo": periodo or "2026-1"
             }
 
-            matricula = self._controlador.crear(datos)
+            nueva = self._controlador.crear(datos)
 
             imprimir_exito(
                 "Matricula registrada correctamente"
             )
 
-            print(matricula)
+            print(nueva)
 
         except (ValueError, TypeError) as error:
             imprimir_error(str(error))
 
-    # -------------------------------------------------
+    # ==============================================
     # AGREGAR NOTA
-    # -------------------------------------------------
+    # ==============================================
 
     def agregar_nota(self):
 
@@ -564,9 +649,10 @@ class MenuMatriculas(MenuCRUD):
             print("3. Examen")
 
             opcion = input(
-                "Seleccione el tipo: "
+                "Elige un tipo: "
             ).strip()
 
+            # Relacionamos cada opcion con un tipo.
             tipos = {
                 "1": "deber",
                 "2": "lección",
@@ -575,11 +661,11 @@ class MenuMatriculas(MenuCRUD):
 
             if opcion not in tipos:
                 raise ValueError(
-                    "Tipo de nota no valido"
+                    "Tipo de nota incorrecto"
                 )
 
             valor = input(
-                "Calificacion (0-20): "
+                "Calificacion (0 a 20): "
             ).strip()
 
             peso = input(
@@ -594,7 +680,7 @@ class MenuMatriculas(MenuCRUD):
             )
 
             imprimir_exito(
-                "Nota agregada correctamente"
+                "Nota registrada correctamente"
             )
 
             print(nota)
@@ -602,13 +688,13 @@ class MenuMatriculas(MenuCRUD):
         except (ValueError, TypeError) as error:
             imprimir_error(str(error))
 
-    # -------------------------------------------------
+    # ==============================================
     # MOSTRAR BOLETIN
-    # -------------------------------------------------
+    # ==============================================
 
     def ver_boletin(self):
 
-        imprimir_titulo("BOLETIN ACADEMICO")
+        imprimir_titulo("VER BOLETIN")
 
         self.mostrar_registros(
             self._controlador.estudiantes.listar()
@@ -619,18 +705,18 @@ class MenuMatriculas(MenuCRUD):
         ).strip()
 
         try:
-            texto = self._controlador.boletin(
+            resultado = self._controlador.boletin(
                 estudiante_id
             )
 
-            print("\n" + texto)
+            print("\n" + resultado)
 
         except (ValueError, TypeError) as error:
             imprimir_error(str(error))
 
-    # -------------------------------------------------
-    # REPORTE DE REPROBADOS
-    # -------------------------------------------------
+    # ==============================================
+    # MOSTRAR REPROBADOS
+    # ==============================================
 
     def ver_reprobados(self):
 
@@ -647,6 +733,7 @@ class MenuMatriculas(MenuCRUD):
             return
 
         for registro in resultados:
+
             print(
                 f"\nEstudiante: {registro['estudiante']}"
             )
@@ -663,9 +750,9 @@ class MenuMatriculas(MenuCRUD):
                 f"Periodo: {registro['periodo']}"
             )
 
-    # -------------------------------------------------
+    # ==============================================
     # MOSTRAR OPCIONES
-    # -------------------------------------------------
+    # ==============================================
 
     def mostrar_opciones(self):
 
@@ -680,11 +767,11 @@ class MenuMatriculas(MenuCRUD):
         print("7. Agregar nota")
         print("8. Ver boletin")
         print("9. Estudiantes reprobados")
-        print("0. Volver")
+        print("0. Volver al menu principal")
 
-    # -------------------------------------------------
+    # ==============================================
     # EJECUTAR MENU
-    # -------------------------------------------------
+    # ==============================================
 
     def ejecutar(self):
 
@@ -693,7 +780,7 @@ class MenuMatriculas(MenuCRUD):
             self.mostrar_opciones()
 
             opcion = input(
-                "\nSeleccione una opcion: "
+                "\nElige una opcion: "
             ).strip()
 
             if opcion == "1":
@@ -727,6 +814,4 @@ class MenuMatriculas(MenuCRUD):
                 break
 
             else:
-                imprimir_error(
-                    "Opcion no valida"
-                )
+                imprimir_error("Opcion incorrecta")
